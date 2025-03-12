@@ -87,9 +87,50 @@ class PKPSwordDeposit {
 	public function setMetadata($request) {
 		$publication = $this->_submission->getCurrentPublication();
 		$this->_package->setCustodian($this->_context->getContactName());
-		$this->_package->setTitle(html_entity_decode($publication->getLocalizedTitle(), ENT_QUOTES, 'UTF-8'));
-		$this->_package->setAbstract(html_entity_decode(strip_tags($publication->getLocalizedData('abstract')), ENT_QUOTES, 'UTF-8'));
+		$this->_package->setTitle(html_entity_decode($this->_submission->getLocalizedTitle(), ENT_QUOTES, 'UTF-8'));
+		$this->_package->setAbstract(html_entity_decode(strip_tags($this->_submission->getLocalizedAbstract()), ENT_QUOTES, 'UTF-8'));
+
+		if ($publication) {
+			$doi = $publication->getStoredPubId('doi');
+		}
+
+		$dispatcher = $request->getDispatcher();
+		$context = $request->getContext();
+		$submissionId = $this->_submission->getId(); 
+		$articleUrl = $dispatcher->url(
+			$request,
+			ROUTE_PAGE,
+			$context->getPath(),
+			'article',
+			'view',
+			['submissionId' => $submissionId]
+		);
+	
+		// Add DOI or URL to the package
+		 if (!empty($doi)) {
+			$this->_package->setIdentifier($doi);  
+		}
+		else {
+			$this->_package->setIdentifier($articleUrl);
+		}
+
+		// Add Issued Date to the package
+		$date = $this->_submission->getDatePublished();
+		$this->_package->setDateAvailable($date);
+		
+		$keywords = $publication->getData('keywords');
+
+		// Add keywords to the package
+		if (!empty($keywords) && is_array($keywords)) {
+			foreach ($keywords as $locale => $keywordArray) {
+				foreach ($keywordArray as $keyword) {
+					$this->_package->addSubject($keyword);
+				}
+			}
+		}
+
 		$this->_package->setType($this->_section->getLocalizedIdentifyType());
+		
 		foreach ($publication->getData('authors') as $author) {
 			$creator = $author->getFullName(true);
 			$affiliation = $author->getLocalizedAffiliation();
